@@ -14,7 +14,7 @@ import Data.Bifunctor
 data Step w r a = Pure a | Weighted w | Solved r
     deriving (Show, Functor, Eq)
 
-type AStar w r a = AStarT w r Identity a
+type AStar r a = forall w. Ord w => AStarT w r Identity a
 
 newtype AStarT w r m a =
     AStarT { unAStarT :: ReaderT (r -> Maybe w) (LogicT m) (Step w r a)
@@ -63,10 +63,10 @@ runAStarT measurer (AStarT m) = fmap (fmap fst) . observeT . msplit . flip runRe
       Solved a -> return a
       _ -> empty
 
-runAStar :: (r -> Maybe w) -> AStar w r a -> Maybe r
+runAStar :: Ord w => (r -> Maybe w) -> AStar r a -> Maybe r
 runAStar measurer = runIdentity . runAStarT measurer
 
-debugAStar :: forall w r a. (r -> Maybe w) -> AStar (Arg w r) r a -> ([(w, r)], Maybe r)
+debugAStar :: forall w r a. Ord w => (r -> Maybe w) -> AStar r a -> ([(w, r)], Maybe r)
 debugAStar measurer = first (fmap argTuple) . runIdentity . astarWhile (const True) annotatedMeasure
   where
     annotatedMeasure :: r -> Maybe (Arg w r)

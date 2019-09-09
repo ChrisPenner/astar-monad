@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 import Control.Monad.AStar
 import Test.Hspec hiding (Arg)
 import Data.Foldable
@@ -36,7 +37,7 @@ distanceTo :: (Int, Int) -> (Int, Int) -> Maybe Int
 distanceTo a b | a == b = Nothing
 distanceTo (x, y) (x', y') = Just $ ((x - x')^2 + (y - y')^2)
 
-findN :: (Ord x) => (Int, Int) -> AStar x (Int, Int) ()
+findN :: (Int, Int) -> AStar (Int, Int) ()
 findN (x, y) = do
     measure (x, y)
     asum
