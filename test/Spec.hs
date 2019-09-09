@@ -30,8 +30,6 @@ main = hspec $ do
         it "should take the shortest path in long situations" $ do
             (length . fst $ debugAStar (distanceTo (5, 5)) (findN (20, 20)))
               `shouldBe` 30
-        -- it "should take shortest path" $ do
-            -- runAStar ()
 
 
 distanceTo :: (Int, Int) -> (Int, Int) -> Maybe Int

@@ -26,6 +26,9 @@ dependencies:
 - mtl
 - hspec
 
+ghc-options:
+  - -Wall
+
 library:
   source-dirs: src
 

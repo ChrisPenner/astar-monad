@@ -6,8 +6,6 @@ module Control.Monad.AStar where
 
 import Control.Monad.Logic
 import Control.Applicative
-import Data.Maybe
-import Data.Foldable
 import Control.Monad.Reader
 import Data.Functor.Identity
 import Data.Semigroup
@@ -29,12 +27,12 @@ instance (Monad m) => Applicative (AStarT w r m) where
 instance (Monad m) => Monad (AStarT w r m) where
   return = AStarT . return . Pure
   AStarT m >>= f = AStarT $ do
-      eval <- ask
       msplit m >>= \case
         Nothing -> empty
         Just (Pure a, _) -> unAStarT . f $ a
         Just (Solved r, _) -> pure $ Solved r
-        Just (Weighted w, m) -> reflect $ Just (Weighted w, unAStarT $ AStarT m >>= f)
+        Just (Weighted w, continue) ->
+            reflect $ Just (Weighted w, unAStarT $ AStarT continue >>= f)
 
 instance (Ord w, Monad m) => Alternative (AStarT w r m) where
   empty = AStarT empty
@@ -44,9 +42,9 @@ weightedInterleave :: (Ord w, Monad m) => AStarT w r m a -> AStarT w r m a -> AS
 weightedInterleave (AStarT a) (AStarT b) = AStarT $ weightedInterleave' a b
 
 weightedInterleave' :: (Ord w, MonadLogic m) => m (Step w r a) -> m (Step w r a) -> m (Step w r a)
-weightedInterleave' a b = do
-    rA <- msplit a
-    rB <- msplit b
+weightedInterleave' ma mb = do
+    rA <- msplit ma
+    rB <- msplit mb
     case (rA, rB) of
         (m, Nothing) -> reflect m
         (Nothing, m) -> reflect m
@@ -54,14 +52,16 @@ weightedInterleave' a b = do
         (_ , Just (Solved a, _)) -> return (Solved a)
         (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
             if lw < rw
-               then reflect (Just (Weighted lw, weightedInterleave' lm (reflect r)))
-               else reflect (Just (Weighted rw, weightedInterleave' rm (reflect l)))
+               then pure (Weighted lw) <|> weightedInterleave' lm (reflect r)
+               else pure (Weighted rw) <|> weightedInterleave' rm (reflect l)
+        (Just (Pure{}, _), m) -> reflect m
+        (m, Just (Pure{}, _)) -> reflect m
 
 runAStarT :: (Monad m) => (r -> Maybe w) -> AStarT w r m a -> m (Maybe r)
 runAStarT measurer (AStarT m) = fmap (fmap fst) . observeT . msplit . flip runReaderT measurer $ do
     m >>= \case
       Solved a -> return a
-      Weighted _ -> empty
+      _ -> empty
 
 runAStar :: (r -> Maybe w) -> AStar w r a -> Maybe r
 runAStar measurer = runIdentity . runAStarT measurer
@@ -74,12 +74,12 @@ debugAStar measurer = first (fmap argTuple) . runIdentity . astarWhile (const Tr
     argTuple (Arg a b) = (a, b)
 
 astarWhile :: Monad m => (w -> Bool) -> (r -> Maybe w) -> AStarT w r m a -> m ([w], Maybe r)
-astarWhile p measure m = do
-    stepAStar measure m >>= \case
+astarWhile p measurer m = do
+    stepAStar measurer m >>= \case
       Nothing -> return ([], Nothing)
-      Just (Pure _, continue) -> astarWhile p measure continue
-      Just (Weighted w, continue) -> 
-          if p w then first (w:) <$> astarWhile p measure continue
+      Just (Pure _, continue) -> astarWhile p measurer continue
+      Just (Weighted w, continue) ->
+          if p w then first (w:) <$> astarWhile p measurer continue
                  else return ([], Nothing)
       Just (Solved r, _) -> return ([], Just r)
 
