@@ -3,8 +3,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.AStar where
 
+import Control.Monad.Except
+import Control.Monad.Fail
+import Control.Monad.Cont
 import Control.Monad.Logic
 import Control.Applicative
 import Control.Monad.Reader
@@ -30,6 +36,13 @@ instance MonadIO m => MonadIO (AStarT w r m) where
 instance (Monad m) => Applicative (AStarT w r m) where
   pure = return
   (<*>) = ap
+
+instance (Ord w, Monad m) => MonadPlus (AStarT w r m) where
+  mzero = empty
+  mplus = (<|>)
+
+instance (Ord w, Monad m) => MonadFail (AStarT w r m) where
+  fail _ = empty
 
 instance (Monad m) => Monad (AStarT w r m) where
   return = AStarT . return . Pure
