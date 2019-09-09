@@ -64,30 +64,46 @@ instance (Monad m) => Monad (AStarT w r m) where
 --   (<|>) = weightedInterleave
 
 -- weightedInterleave :: (Ord w, Monad m) => AStarT w r m a -> AStarT w r m a -> AStarT w r m a
--- weightedInterleave (AStarT ma) (AStarT mb) = AStarT . lift $ do
+-- weightedInterleave (AStarT ma) (AStarT mb) = AStarT . lift $ weightedInterleave' ma mb
+
+-- flatten :: (Ord w, Monad m) => FreeT ((,) (Step w r)) (LogicT m) a -> LogicT m (Either (Step w r) a)
+-- flatten m = weightedInterleave' m empty
+
+-- weightedInterleave' :: (Ord w, Monad m) => FreeT ((,) (Step w r)) (LogicT m) a -> FreeT ((,) (Step w r)) (LogicT m) a -> LogicT m (Either (Step w r) a)
+-- weightedInterleave' ma mb = do
 --     rA <- msplit . runFreeT $ ma
 --     rB <- msplit . runFreeT $ mb
 --     case (rA, rB) of
---         (m, Nothing) -> _ $ reflect m
+--         (Nothing, Nothing) -> empty
+--         (Just (Pure a, continue), Nothing) -> pure (Right a) <|> flatten (FreeT continue)
+--         (Just (Free (Solved r, _), _), _) -> pure $ Left (Solved r)
+-- --         (_ , Just (Solved a, _)) -> return (Solved a)
+-- --         (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
+-- --             if lw < rw
+-- --                then pure (Weighted lw) <|> weightedInterleave' lm (reflect r)
+-- --                else pure (Weighted rw) <|> weightedInterleave' rm (reflect l)
+-- --         (Just (Pure{}, _), m) -> reflect m
+-- --         (m, Just (Pure{}, _)) -> reflect m
 
--- weightedInterleave' :: (Ord w, MonadLogic m) => m (FreeF (Step w r) _ _) -> m (Step w r a) -> m (Step w r a)
--- weightedInterleave' ma mb = do
---     rA <- msplit ma
---     rB <- msplit mb
---     case (rA, rB) of
---         (m, Nothing) -> reflect m
---         (Nothing, m) -> reflect m
---         (Just (Solved a, _), _) -> return (Solved a)
---         (_ , Just (Solved a, _)) -> return (Solved a)
---         (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
---             if lw < rw
---                then pure (Weighted lw) <|> weightedInterleave' lm (reflect r)
---                else pure (Weighted rw) <|> weightedInterleave' rm (reflect l)
---         (Just (Pure{}, _), m) -> reflect m
---         (m, Just (Pure{}, _)) -> reflect m
 
--- runAStarT :: (Monad m) => AStarT w r m a -> m (Maybe r)
--- runAStarT (AStarT m) = fmap (fmap fst) . observeT . msplit $ do
---     m >>= \case
---       Solved a -> return a
---       _ -> empty
+-- -- weightedInterleave' :: (Ord w, MonadLogic m) => m (FreeF (Step w r) _ _) -> m (Step w r a) -> m (Step w r a)
+-- -- weightedInterleave' ma mb = do
+-- --     rA <- msplit ma
+-- --     rB <- msplit mb
+-- --     case (rA, rB) of
+-- --         (m, Nothing) -> reflect m
+-- --         (Nothing, m) -> reflect m
+-- --         (Just (Solved a, _), _) -> return (Solved a)
+-- --         (_ , Just (Solved a, _)) -> return (Solved a)
+-- --         (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
+-- --             if lw < rw
+-- --                then pure (Weighted lw) <|> weightedInterleave' lm (reflect r)
+-- --                else pure (Weighted rw) <|> weightedInterleave' rm (reflect l)
+-- --         (Just (Pure{}, _), m) -> reflect m
+-- --         (m, Just (Pure{}, _)) -> reflect m
+
+-- -- runAStarT :: (Monad m) => AStarT w r m a -> m (Maybe r)
+-- -- runAStarT (AStarT m) = fmap (fmap fst) . observeT . msplit $ do
+-- --     m >>= \case
+-- --       Solved a -> return a
+-- --       _ -> empty
