@@ -24,6 +24,7 @@ dependencies:
 - logict
 - logict-state
 - mtl
+- hspec
 
 library:
   source-dirs: src
@@ -38,3 +39,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - astart
+    - hspec

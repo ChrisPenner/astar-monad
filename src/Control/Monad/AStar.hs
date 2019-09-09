@@ -1,6 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Control.Monad.AStar where
 
 import Control.Monad.Logic
@@ -10,6 +11,10 @@ import Data.Foldable
 import Control.Monad.Reader
 import Data.Functor.Identity
 import Data.Semigroup
+import Data.Bifunctor
+
+data Step w r a = Pure a | Weighted w | Solved r
+    deriving (Show, Functor, Eq)
 
 type AStar w r a = AStarT w r Identity a
 
@@ -52,21 +57,34 @@ weightedInterleave' a b = do
                then reflect (Just (Weighted lw, weightedInterleave' lm (reflect r)))
                else reflect (Just (Weighted rw, weightedInterleave' rm (reflect l)))
 
-findSolved :: Step w r a -> Maybe (First r)
-findSolved (Solved r) = Just (First r)
-findSolved _ = Nothing
-
 runAStarT :: (Monad m) => (r -> Maybe w) -> AStarT w r m a -> m (Maybe r)
-runAStarT measurer = fmap (fmap getFirst . foldMap findSolved) . observeAllT . flip runReaderT measurer . unAStarT
+runAStarT measurer (AStarT m) = fmap (fmap fst) . observeT . msplit . flip runReaderT measurer $ do
+    m >>= \case
+      Solved a -> return a
+      Weighted _ -> empty
 
 runAStar :: (r -> Maybe w) -> AStar w r a -> Maybe r
 runAStar measurer = runIdentity . runAStarT measurer
 
-debugAStar :: (r -> Maybe w) -> AStar w r a -> [Step w r a]
-debugAStar measurer = observeAll . flip runReaderT measurer . unAStarT
+debugAStar :: forall w r a. (r -> Maybe w) -> AStar (Arg w r) r a -> ([(w, r)], Maybe r)
+debugAStar measurer = first (fmap argTuple) . runIdentity . astarWhile (const True) annotatedMeasure
+  where
+    annotatedMeasure :: r -> Maybe (Arg w r)
+    annotatedMeasure r = Arg <$> measurer r <*> return r
+    argTuple (Arg a b) = (a, b)
 
-data Step w r a = Pure a | Weighted w | Solved r
-    deriving (Show, Functor)
+astarWhile :: Monad m => (w -> Bool) -> (r -> Maybe w) -> AStarT w r m a -> m ([w], Maybe r)
+astarWhile p measure m = do
+    stepAStar measure m >>= \case
+      Nothing -> return ([], Nothing)
+      Just (Pure _, continue) -> astarWhile p measure continue
+      Just (Weighted w, continue) -> 
+          if p w then first (w:) <$> astarWhile p measure continue
+                 else return ([], Nothing)
+      Just (Solved r, _) -> return ([], Just r)
+
+stepAStar :: (Monad m) => (r -> Maybe w) -> AStarT w r m a -> m (Maybe (Step w r a, AStarT w r m a))
+stepAStar measurer (AStarT m) = fmap (fmap $ second AStarT) . observeT . flip runReaderT measurer $ msplit m
 
 measure :: (Monad m) => r -> AStarT w r m ()
 measure r = AStarT $ do
@@ -75,17 +93,7 @@ measure r = AStarT $ do
         Nothing -> pure (Solved r)
         (Just w) -> reflect (Just (Weighted w, return (Pure ())))
 
-searchFor :: Int -> Int -> Maybe Int
-searchFor end start
-    | end == start = Nothing
-searchFor end start = Just $ abs (end - start)
-
-findN :: Int -> AStar Int Int ()
-findN n = do
-    measure n
-    asum
-        [ findN (n * 10)
-        , findN (n * 3)
-        , findN (n - 1)
-        , findN (n + 2)
-        ]
+searchEq :: Eq a => a -> (a -> w) -> a -> Maybe w
+searchEq dest f a
+    | dest == a = Nothing
+    | otherwise = Just $ f a
