@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 import Control.Monad.AStar
+import Control.Monad.IO.Class
 import Test.Hspec hiding (Arg)
 import Data.Foldable
 import Data.Semigroup
@@ -12,12 +13,10 @@ argFirst (Arg a _) = a
 argSecond :: Arg a b -> b
 argSecond (Arg _ b) = b
 
-
 mapWeight :: (w -> x) -> Step w r a -> Step x r a
 mapWeight f (Weighted w) = Weighted $ f w
 mapWeight _ (Solved r) = Solved r
 mapWeight _ (Pure a) = Pure a
-
 
 main :: IO ()
 main = hspec $ do
@@ -32,12 +31,11 @@ main = hspec $ do
             (length . fst $ debugAStar (distanceTo (5, 5)) (findN (20, 20)))
               `shouldBe` 30
 
-
 distanceTo :: (Int, Int) -> (Int, Int) -> Maybe Int
 distanceTo a b | a == b = Nothing
 distanceTo (x, y) (x', y') = Just $ ((x - x')^2 + (y - y')^2)
 
-findN :: (Int, Int) -> AStar (Int, Int) ()
+findN :: (Ord w) => (Int, Int) -> AStar w (Int, Int) ()
 findN (x, y) = do
     measure (x, y)
     asum
@@ -45,4 +43,15 @@ findN (x, y) = do
         , findN (x - 1, y)
         , findN (x, y + 1)
         , findN (x, y - 1)
+        ]
+
+findN' :: (MonadIO m, Ord w) => (Int, Int) -> AStarT w (Int, Int) m ()
+findN' (x, y) = do
+    measure (x, y)
+    liftIO $ print (x, y)
+    asum
+        [ findN' (x + 1, y)
+        , findN' (x - 1, y)
+        , findN' (x, y + 1)
+        , findN' (x, y - 1)
         ]
