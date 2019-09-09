@@ -25,6 +25,7 @@ dependencies:
 - logict-state
 - mtl
 - hspec
+- free
 
 ghc-options:
   - -Wall

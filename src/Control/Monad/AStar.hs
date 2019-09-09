@@ -35,10 +35,10 @@ mapResult f (AStarT m) = AStarT $ fmap go m
 instance MonadTrans (AStarT w r) where
   lift m = AStarT . lift $ (Pure <$> m)
 
-instance MonadIO m => MonadIO (AStarT w r m) where
+instance (MonadIO m, Ord w) => MonadIO (AStarT w r m) where
   liftIO io = lift $ liftIO io
 
-instance (Monad m) => Applicative (AStarT w r m) where
+instance (Monad m, Ord w) => Applicative (AStarT w r m) where
   pure = return
   (<*>) = ap
 
@@ -49,12 +49,12 @@ instance (Ord w, Monad m) => MonadPlus (AStarT w r m) where
 instance (Ord w, Monad m) => MonadFail (AStarT w r m) where
   fail _ = empty
 
-instance (Monad m) => Monad (AStarT w r m) where
+instance (Monad m, Ord w) => Monad (AStarT w r m) where
   return = AStarT . return . Pure
   AStarT m >>= f = AStarT $ do
       msplit m >>= \case
         Nothing -> empty
-        Just (Pure a, _) -> unAStarT . f $ a
+        Just (Pure a, continue) -> unAStarT $ (f a) `weightedInterleave` (AStarT continue >>= f)
         Just (Solved r, _) -> pure $ Solved r
         Just (Weighted w, continue) ->
             reflect $ Just (Weighted w, unAStarT $ AStarT continue >>= f)
@@ -116,10 +116,10 @@ done = AStarT . pure . Solved
 updateCost :: Monad m => w -> AStarT w r m ()
 updateCost w = AStarT $ pure (Weighted w) <|> return (Pure ())
 
-measure :: (Monad m) => (a -> m (Either w r)) -> a -> AStarT w r m ()
+measure :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT w r m ()
 measure eval a = lift (eval a) >>= either updateCost done
 
-measure' :: (Monad m) => (a -> m (Either w r)) -> a -> AStarT (Arg w a) r m ()
+measure' :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT (Arg w a) r m ()
 measure' eval = measure (\a -> fmap (first (flip Arg a)) $ eval a)
 
 searchEq :: Eq a => a -> (a -> w) -> a -> Maybe w
