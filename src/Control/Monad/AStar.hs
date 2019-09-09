@@ -12,6 +12,7 @@ import Control.Monad.Except
 import Control.Monad.Fail
 import Control.Monad.Logic
 import Control.Applicative
+import Control.Monad.State
 import Data.Functor.Identity
 import Data.Semigroup
 import Data.Bifunctor
@@ -19,37 +20,37 @@ import Data.Bifunctor
 data Step w r a = Pure a | Weighted w | Solved r
     deriving (Show, Functor, Eq)
 
-type AStar w r a = AStarT w r Identity a
+type AStar s w r a = AStarT s w r Identity a
 
-newtype AStarT w r m a =
-    AStarT { unAStarT :: (LogicT m) (Step w r a)
+newtype AStarT s w r m a =
+    AStarT { unAStarT :: StateT s (LogicT m) (Step w r a)
           } deriving stock Functor
 
-mapResult :: (r -> r') -> AStarT w r m a -> AStarT w r' m a
+mapResult :: (r -> r') -> AStarT s w r m a -> AStarT s w r' m a
 mapResult f (AStarT m) = AStarT $ fmap go m
   where
     go (Pure a) = Pure a
     go (Weighted w) = Weighted w
     go (Solved r) = Solved $ f r
 
-instance MonadTrans (AStarT w r) where
-  lift m = AStarT . lift $ (Pure <$> m)
+instance MonadTrans (AStarT s w r) where
+  lift m = AStarT . lift . lift $ (Pure <$> m)
 
-instance (MonadIO m, Ord w) => MonadIO (AStarT w r m) where
+instance (MonadIO m, Ord w) => MonadIO (AStarT s w r m) where
   liftIO io = lift $ liftIO io
 
-instance (Monad m, Ord w) => Applicative (AStarT w r m) where
+instance (Monad m, Ord w) => Applicative (AStarT s w r m) where
   pure = return
   (<*>) = ap
 
-instance (Ord w, Monad m) => MonadPlus (AStarT w r m) where
+instance (Ord w, Monad m) => MonadPlus (AStarT s w r m) where
   mzero = empty
   mplus = (<|>)
 
-instance (Ord w, Monad m) => MonadFail (AStarT w r m) where
+instance (Ord w, Monad m) => MonadFail (AStarT s w r m) where
   fail _ = empty
 
-instance (Monad m, Ord w) => Monad (AStarT w r m) where
+instance (Monad m, Ord w) => Monad (AStarT s w r m) where
   return = AStarT . return . Pure
   AStarT m >>= f = AStarT $ do
       msplit m >>= \case
@@ -59,11 +60,11 @@ instance (Monad m, Ord w) => Monad (AStarT w r m) where
         Just (Weighted w, continue) ->
             reflect $ Just (Weighted w, unAStarT $ AStarT continue >>= f)
 
-instance (Ord w, Monad m) => Alternative (AStarT w r m) where
+instance (Ord w, Monad m) => Alternative (AStarT s w r m) where
   empty = AStarT empty
   (<|>) = weightedInterleave
 
-weightedInterleave :: (Ord w, Monad m) => AStarT w r m a -> AStarT w r m a -> AStarT w r m a
+weightedInterleave :: (Ord w, Monad m) => AStarT s w r m a -> AStarT s w r m a -> AStarT s w r m a
 weightedInterleave (AStarT a) (AStarT b) = AStarT $ weightedInterleave' a b
 
 weightedInterleave' :: (Ord w, MonadLogic m) => m (Step w r a) -> m (Step w r a) -> m (Step w r a)
@@ -82,44 +83,46 @@ weightedInterleave' ma mb = do
         (Just (Pure{}, _), m) -> reflect m
         (m, Just (Pure{}, _)) -> reflect m
 
-runAStarT :: (Monad m) => AStarT w r m a -> m (Maybe r)
-runAStarT (AStarT m) = fmap (fmap fst) . observeT . msplit $ do
-    m >>= \case
-      Solved a -> return a
+runAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe (r, s))
+runAStarT (AStarT m) s = fmap (fmap fst) . observeT . msplit $ do
+    runStateT m s >>= \case
+      (Solved a, s) -> return (a, s)
       _ -> empty
 
-runAStar :: AStar w r a -> Maybe r
-runAStar = runIdentity . runAStarT
+runAStar :: AStar s w r a -> s -> Maybe (r, s)
+runAStar m s = runIdentity $ runAStarT  m s
 
-debugAStar :: AStar w r a -> ([w], Maybe r)
-debugAStar = runIdentity . debugAStarT
+debugAStar :: AStar s w r a -> s -> ([w], Maybe (r, s))
+debugAStar m s = runIdentity $ debugAStarT m s
 
-debugAStarT :: (Monad m) => AStarT w r m a -> m ([w], Maybe r)
-debugAStarT = astarWhile (const True)
+debugAStarT :: (Monad m) => AStarT s w r m a -> s -> m ([w], Maybe (r, s))
+debugAStarT m s = astarWhile (const True) m s
 
-astarWhile :: Monad m => (w -> Bool) -> AStarT w r m a -> m ([w], Maybe r)
-astarWhile p m = do
-    stepAStar m >>= \case
+astarWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m ([w], Maybe (r, s))
+astarWhile p m s = do
+    stepAStar m s >>= \case
       Nothing -> return ([], Nothing)
-      Just (Pure _, continue) -> astarWhile p continue
-      Just (Weighted w, continue) ->
-          if p w then first (w:) <$> astarWhile p continue
+      Just ((Pure _, s), continue) -> astarWhile p continue s
+      Just ((Weighted w, s), continue) ->
+          if p w then first (w:) <$> astarWhile p continue s
                  else return ([], Nothing)
-      Just (Solved r, _) -> return ([], Just r)
+      Just ((Solved r, s), _) -> return ([], Just (r, s))
 
-stepAStar :: (Monad m) => AStarT w r m a -> m (Maybe (Step w r a, AStarT w r m a))
-stepAStar (AStarT m) = fmap (fmap $ second AStarT) . observeT $ msplit m
+stepAStar :: (Monad m) => AStarT s w r m a -> s -> m (Maybe ((Step w r a, s), AStarT s w r m a))
+stepAStar (AStarT m) s = fmap (fmap go) . observeT . (fmap . fmap . fmap . fmap) fst $ msplit (runStateT m s)
+  where
+    go (v, x) = (v, AStarT (lift x))
 
-done :: r -> AStarT w r m a
+done :: r -> AStarT s w r m a
 done = AStarT . pure . Solved
 
-updateCost :: Monad m => w -> AStarT w r m ()
+updateCost :: Monad m => w -> AStarT s w r m ()
 updateCost w = AStarT $ pure (Weighted w) <|> return (Pure ())
 
-measure :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT w r m ()
+measure :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT s w r m ()
 measure eval a = lift (eval a) >>= either updateCost done
 
-measure' :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT (Arg w a) r m ()
+measure' :: (Monad m, Ord w) => (a -> m (Either w r)) -> a -> AStarT s (Arg w a) r m ()
 measure' eval = measure (\a -> fmap (first (flip Arg a)) $ eval a)
 
 searchEq :: Eq a => a -> (a -> w) -> a -> Maybe w
