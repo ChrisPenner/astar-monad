@@ -50,6 +50,10 @@ instance (Ord w, Monad m) => MonadPlus (AStarT s w r m) where
 instance (Ord w, Monad m) => MonadFail (AStarT s w r m) where
   fail _ = empty
 
+instance (Ord w, Monad m) => MonadState s (AStarT s w r m) where
+  get = AStarT $ Pure <$> get
+  put s = AStarT $ Pure <$> put s
+
 instance (Monad m, Ord w) => Monad (AStarT s w r m) where
   return = AStarT . return . Pure
   AStarT m >>= f = AStarT $ do
@@ -57,7 +61,7 @@ instance (Monad m, Ord w) => Monad (AStarT s w r m) where
         Nothing -> empty
         Just (Pure a, continue) -> unAStarT $ (f a) `weightedInterleave` (AStarT continue >>= f)
         Just (Solved r, _) -> pure $ Solved r
-        Just (Weighted w, continue) ->
+        Just (Weighted w, continue) -> do
             reflect $ Just (Weighted w, unAStarT $ AStarT continue >>= f)
 
 instance (Ord w, Monad m) => Alternative (AStarT s w r m) where
@@ -67,21 +71,24 @@ instance (Ord w, Monad m) => Alternative (AStarT s w r m) where
 weightedInterleave :: (Ord w, Monad m) => AStarT s w r m a -> AStarT s w r m a -> AStarT s w r m a
 weightedInterleave (AStarT a) (AStarT b) = AStarT $ weightedInterleave' a b
 
-weightedInterleave' :: (Ord w, MonadLogic m) => m (Step w r a) -> m (Step w r a) -> m (Step w r a)
+weightedInterleave' :: (Ord w, MonadLogic m, MonadState s m) => m (Step w r a) -> m (Step w r a) -> m (Step w r a)
 weightedInterleave' ma mb = do
-    rA <- msplit ma
-    rB <- msplit mb
+    beforeBoth <- get
+    (rA, aAfterState) <- liftA2 (,) (msplit ma) get
+    put beforeBoth
+    (rB, bAfterState) <- liftA2 (,) (msplit mb) get
+    put beforeBoth
     case (rA, rB) of
-        (m, Nothing) -> reflect m
-        (Nothing, m) -> reflect m
-        (Just (Solved a, _), _) -> return (Solved a)
-        (_ , Just (Solved a, _)) -> return (Solved a)
+        (m, Nothing) -> put aAfterState >> reflect m
+        (Nothing, m) -> put bAfterState >> reflect m
+        (Just (Solved a, _), _) -> put aAfterState >> return (Solved a)
+        (_ , Just (Solved a, _)) -> put bAfterState >> return (Solved a)
         (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
             if lw < rw
-               then pure (Weighted lw) <|> weightedInterleave' lm (reflect r)
-               else pure (Weighted rw) <|> weightedInterleave' rm (reflect l)
-        (Just (Pure{}, _), m) -> reflect m
-        (m, Just (Pure{}, _)) -> reflect m
+               then (put aAfterState >> pure (Weighted lw)) <|> weightedInterleave' (put aAfterState >> lm) (put bAfterState >> reflect r)
+               else (put bAfterState >> pure (Weighted rw)) <|> weightedInterleave' (put bAfterState >> rm) (put aAfterState >> reflect l)
+        (Just (Pure a, continue), m) -> (put aAfterState >> (pure (Pure a) <|> continue)) `weightedInterleave'` (put bAfterState >> reflect m)
+        (m, Just (Pure a, continue)) -> (put aAfterState >> reflect m) `weightedInterleave'` (put bAfterState >> (pure (Pure a) <|> continue))
 
 runAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe (r, s))
 runAStarT (AStarT m) s = fmap (fmap fst) . observeT . msplit $ do
@@ -92,21 +99,21 @@ runAStarT (AStarT m) s = fmap (fmap fst) . observeT . msplit $ do
 runAStar :: AStar s w r a -> s -> Maybe (r, s)
 runAStar m s = runIdentity $ runAStarT  m s
 
-debugAStar :: AStar s w r a -> s -> ([w], Maybe (r, s))
+debugAStar :: AStar s w r a -> s -> (Maybe (r, s))
 debugAStar m s = runIdentity $ debugAStarT m s
 
-debugAStarT :: (Monad m) => AStarT s w r m a -> s -> m ([w], Maybe (r, s))
+debugAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe (r, s))
 debugAStarT m s = astarWhile (const True) m s
 
-astarWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m ([w], Maybe (r, s))
+astarWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m (Maybe (r, s))
 astarWhile p m s = do
     stepAStar m s >>= \case
-      Nothing -> return ([], Nothing)
+      Nothing -> return Nothing
       Just ((Pure _, s), continue) -> astarWhile p continue s
       Just ((Weighted w, s), continue) ->
-          if p w then first (w:) <$> astarWhile p continue s
-                 else return ([], Nothing)
-      Just ((Solved r, s), _) -> return ([], Just (r, s))
+          if p w then astarWhile p continue s
+                 else return Nothing
+      Just ((Solved r, s), _) -> return (Just (r, s))
 
 stepAStar :: (Monad m) => AStarT s w r m a -> s -> m (Maybe ((Step w r a, s), AStarT s w r m a))
 stepAStar (AStarT m) s = fmap (fmap go) . observeT . (fmap . fmap . fmap . fmap) fst $ msplit (runStateT m s)

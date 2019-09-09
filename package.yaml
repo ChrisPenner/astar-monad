@@ -26,6 +26,7 @@ dependencies:
 - mtl
 - hspec
 - free
+- lens
 
 ghc-options:
   - -Wall
@@ -44,3 +45,4 @@ tests:
     dependencies:
     - astart
     - hspec
+    - lens
