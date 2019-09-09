@@ -25,6 +25,13 @@ newtype AStarT w r m a =
     AStarT { unAStarT :: (LogicT m) (Step w r a)
           } deriving stock Functor
 
+mapResult :: (r -> r') -> AStarT w r m a -> AStarT w r' m a
+mapResult f (AStarT m) = AStarT $ fmap go m
+  where
+    go (Pure a) = Pure a
+    go (Weighted w) = Weighted w
+    go (Solved r) = Solved $ f r
+
 instance MonadTrans (AStarT w r) where
   lift m = AStarT . lift $ (Pure <$> m)
 

@@ -23,17 +23,17 @@ main :: IO ()
 main = hspec $ do
     describe "a-star" $ do
         it "should find a solution" $ do
-            runReader (runAStarT (findN (0, 0))) (5, 5)
-              `shouldBe` Just (5, 5)
+            runReader (runAStarT (findN' (3, 6))) (5, 5)
+              `shouldBe` Just [U, R, R]
         it "should take the shortest path" $ do
-            runReader (debugAStarT (findN (4, 6))) (5, 5)
-              `shouldBe` ([(Arg 2 (4, 6)), Arg 1 (4, 5)], Just (5, 5))
+            runReader (debugAStarT (findN' (4, 6))) (5, 5)
+              `shouldBe` ([2, 1], Just [U, R])
         it "should take the shortest path in long situations" $ do
-            (length . fst $ runReader (debugAStarT $ findN (20, 20)) (5, 5))
+            (length . fst $ runReader (debugAStarT $ findN' (20, 20)) (5, 5))
               `shouldBe` 30
 
 distanceTo :: (Int, Int) -> (Int, Int) -> Int
-distanceTo (x, y) (x', y') = ((x - x')^2 + (y - y')^2)
+distanceTo (x, y) (x', y') = abs (x - x') + abs (y - y')
 
 check :: MonadReader (Int, Int) m => (Int, Int) -> m (Either Int (Int, Int))
 check coord = do
@@ -50,4 +50,20 @@ findN (x, y) = do
         , findN (x - 1, y)
         , findN (x, y + 1)
         , findN (x, y - 1)
+        ]
+
+data Move = U | D | L | R
+    deriving (Show, Eq)
+
+findN' :: (MonadReader (Int, Int) m) => (Int, Int) -> AStarT Int [Move] m ()
+findN' (x, y) = do
+    goal <- lift ask
+    if (x, y) == goal
+       then done []
+       else updateCost $ distanceTo goal (x, y)
+    asum
+        [ mapResult (R:) $ findN' (x + 1, y)
+        , mapResult (L:) $ findN' (x - 1, y)
+        , mapResult (D:) $ findN' (x, y + 1)
+        , mapResult (U:) $ findN' (x, y - 1)
         ]
