@@ -27,13 +27,13 @@ main :: IO ()
 main = hspec $ do
     describe "a-star" $ do
         it "should find a solution" $ do
-            (view moves . snd <$> runAStar findN (Context (3, 6) (5, 5) []))
+            (view moves . snd <$> runAStar findPoint (Context (3, 6) (5, 5) []))
               `shouldBe` Just ([U, R, R])
         it "should take the shortest path" $ do
-            (view moves . snd <$> runAStar findN (Context (4, 6) (5, 5) []))
+            (view moves . snd <$> runAStar findPoint (Context (4, 6) (5, 5) []))
               `shouldBe` (Just [U, R])
         it "should take the shortest path in long situations" $ do
-            (length . view moves . snd <$> runAStar findN (Context (4, 6) (20, 20) []))
+            (length . view moves . snd <$> runAStar findPoint (Context (4, 6) (20, 20) []))
               `shouldBe` Just 30
     describe "tryWhile" $ do
         it "should stop if weight gets too high" $ do
@@ -51,16 +51,15 @@ main = hspec $ do
 distanceTo :: (Int, Int) -> (Int, Int) -> Int
 distanceTo (x, y) (x', y') = abs (x - x') + abs (y - y')
 
-findN :: Monad m => AStarT Context Int () m ()
-findN = do
+findPoint :: AStar Context Int () ()
+findPoint = do
     c <- use current
     gl <- use goal
-    if c == gl
-       then done ()
-       else updateCost $ distanceTo gl c
+    when (c == gl) $ done ()
+    updateCost $ distanceTo gl c
     asum
-        [ moves <>= [R] >> current . _1 += 1 >> findN
-        , moves <>= [L] >> current . _1 -= 1 >> findN
-        , moves <>= [D] >> current . _2 += 1 >> findN
-        , moves <>= [U] >> current . _2 -= 1 >> findN
+        [ moves <>= [R] >> current . _1 += 1 >> findPoint
+        , moves <>= [L] >> current . _1 -= 1 >> findPoint
+        , moves <>= [D] >> current . _2 += 1 >> findPoint
+        , moves <>= [U] >> current . _2 -= 1 >> findPoint
         ]

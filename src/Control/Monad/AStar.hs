@@ -117,6 +117,12 @@ execAStarT m s = fmap snd <$> runAStarT m s
 evalAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe r)
 evalAStarT m s = fmap fst <$> runAStarT m s
 
+execAStar :: AStar s w r a -> s -> (Maybe s)
+execAStar m s = fmap snd $ runAStar m s
+
+evalAStar :: AStar s w r a -> s -> (Maybe r)
+evalAStar m s = fmap fst $ runAStar m s
+
 -- tryWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> AStarT s w r m a
 -- tryWhile p (AStarT m) = AStarT $ do
 --     m >>= \case
