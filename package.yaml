@@ -1,6 +1,6 @@
-name:                astart
+name:                astar-monad
 version:             0.1.0.0
-github:              "ChrisPenner/astart"
+github:              "ChrisPenner/astar-monad"
 license:             BSD3
 author:              "Chris Penner"
 maintainer:          "christopher.penner@gmail.com"
@@ -17,16 +17,12 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/ChrisPenner/astart#readme>
+description:         Please see the README on GitHub at <https://github.com/ChrisPenner/astar-monad#readme>
 
 dependencies:
 - base >= 4.7 && < 5
 - logict
-- logict-state
 - mtl
-- hspec
-- free
-- lens
 
 ghc-options:
   - -Wall
@@ -36,7 +32,7 @@ library:
   source-dirs: src
 
 tests:
-  astart-test:
+  astar-monad-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -44,6 +40,6 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - astart
+    - astar-monad
     - hspec
     - lens

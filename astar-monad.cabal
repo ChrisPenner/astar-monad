@@ -1,0 +1,57 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 2dcf848eb88f8bee2677625711e21e55990a9c024a325df055d0740adbe2a4c8
+
+name:           astar-monad
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/ChrisPenner/astar-monad#readme>
+homepage:       https://github.com/ChrisPenner/astar-monad#readme
+bug-reports:    https://github.com/ChrisPenner/astar-monad/issues
+author:         Chris Penner
+maintainer:     christopher.penner@gmail.com
+copyright:      Chris Penner
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/ChrisPenner/astar-monad
+
+library
+  exposed-modules:
+      Control.Monad.AStar
+  other-modules:
+      Paths_astar_monad
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wno-name-shadowing
+  build-depends:
+      base >=4.7 && <5
+    , logict
+    , mtl
+  default-language: Haskell2010
+
+test-suite astar-monad-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_astar_monad
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wno-name-shadowing -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      astar-monad
+    , base >=4.7 && <5
+    , hspec
+    , lens
+    , logict
+    , mtl
+  default-language: Haskell2010
