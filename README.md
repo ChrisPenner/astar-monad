@@ -11,7 +11,7 @@ Easily do A\* searches with use of arbitrary monadic effects!
 * Use `updateCost myCost` to set the value of your 'heuristic' function whenever you've done enough work to change your estimate.  Remember that A\* heuristics should always be pessimistic (e.g. can over-estimate cost, but shouldn't UNDER estimate). 
 * Every call to `updateCost` creates a branch; Branches with LOWER costs will run before those with higher costs.
 * Call `done mySolution` to short circuit ALL running branches and immediately return your result.
-* `AStarT` has a built-in State monad  which **automatically keeps state contiguous in spite of branching**. This means that your state monad will properly switch states when switching branches. Just use state normally, it should work as expected. You can store your current branch's solution-space for instance, or the path you've followed to get to the current solution; or both!
+* `AStarT` has a built-in State monad  which **automatically keeps state contiguous in spite of branching**. This means that your state monad will properly switch states when switching branches. Just use state normally, it should work as expected; A.K.A. each branch has its own local state. You can store your current branch's solution-space for instance, or the path you've followed to get to the current solution; or both!
 
 Here's an example of using A\* to find a path to a location in a 2 dimensional grid.
 
