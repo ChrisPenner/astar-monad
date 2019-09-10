@@ -38,7 +38,7 @@ main = hspec $ do
     describe "tryWhile" $ do
         it "should stop if weight gets too high" $ do
               -- Use tuple monad to see how far we get
-              do flip (tryWhile (< 4)) () $ do
+              do flip (tryWhileT (< 4)) () $ do
                     asum [ updateCost (10 :: Int) >> lift ([10], ()) >> empty
                           , updateCost (1 :: Int) >> lift ([1], ()) >> empty
                           , updateCost (5 :: Int) >> lift ([5], ()) >> empty

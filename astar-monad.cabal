@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2dcf848eb88f8bee2677625711e21e55990a9c024a325df055d0740adbe2a4c8
+-- hash: 9b0da561d4a2aab07a5b16f423b1a711563fb04085433460b4f91879142f5f9b
 
 name:           astar-monad
 version:        0.1.0.0
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Control.Monad.AStar
+      Control.Monad.AStar.Class
   other-modules:
       Paths_astar_monad
   hs-source-dirs:

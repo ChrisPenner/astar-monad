@@ -3,7 +3,6 @@ A\* Monad
 
 Easily do A\* searches with use of arbitrary monadic effects!
 
-
 ## Basics
 
 * Use `<|>` or `asum` (anything using `Alternative`) to branch into multiple possible choices.
