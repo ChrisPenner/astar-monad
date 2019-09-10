@@ -1,6 +1,8 @@
 A\* Monad
 =========
 
+[Hackage](http://hackage.haskell.org/package/astar-monad)
+
 Easily do A\* searches with use of arbitrary monadic effects!
 
 ## Basics
