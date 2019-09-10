@@ -6,6 +6,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Control.Monad.AStar where
 
 import Control.Monad.Except
@@ -16,6 +18,7 @@ import Control.Monad.State
 import Data.Functor.Identity
 import Data.Semigroup
 import Data.Bifunctor
+import Data.Maybe
 
 data Step w r a = Pure a | Weighted w | Solved r
     deriving (Show, Functor, Eq)
@@ -74,24 +77,33 @@ weightedInterleave (AStarT a) (AStarT b) = AStarT $ weightedInterleave' a b
 weightedInterleave' :: (Ord w, MonadLogic m, MonadState s m) => m (Step w r a) -> m (Step w r a) -> m (Step w r a)
 weightedInterleave' ma mb = do
     beforeBoth <- get
-    (rA, aAfterState) <- liftA2 (,) (msplit ma) get
+    (rA, lState) <- liftA2 (,) (msplit ma) get
     put beforeBoth
-    (rB, bAfterState) <- liftA2 (,) (msplit mb) get
-    put beforeBoth
+    (rB, rState) <- liftA2 (,) (msplit mb) get
     case (rA, rB) of
-        (m, Nothing) -> put aAfterState >> reflect m
-        (Nothing, m) -> put bAfterState >> reflect m
-        (Just (Solved a, _), _) -> put aAfterState >> return (Solved a)
-        (_ , Just (Solved a, _)) -> put bAfterState >> return (Solved a)
-        (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm))) ->
-            if lw < rw
-               then (put aAfterState >> pure (Weighted lw)) <|> weightedInterleave' (put aAfterState >> lm) (put bAfterState >> reflect r)
-               else (put bAfterState >> pure (Weighted rw)) <|> weightedInterleave' (put bAfterState >> rm) (put aAfterState >> reflect l)
-        (Just (Pure a, continue), m) -> (put aAfterState >> (pure (Pure a) <|> continue)) `weightedInterleave'` (put bAfterState >> reflect m)
-        (m, Just (Pure a, continue)) -> (put aAfterState >> reflect m) `weightedInterleave'` (put bAfterState >> (pure (Pure a) <|> continue))
+        (m, Nothing) -> put lState >> reflect m
+        (Nothing, m) -> put rState >> reflect m
+        (Just (Solved a, _), _) -> put lState >> pure (Solved a)
+        (_ , Just (Solved a, _)) -> put rState >> pure (Solved a)
+        (l@(Just (Weighted lw, lm)), r@(Just (Weighted rw, rm)))
+          | lw < rw ->
+              (put lState >> pure (Weighted lw))
+                <|> ((put lState >> lm) `weightedInterleave'` (put rState >> reflect r))
+          | otherwise ->
+              (put rState >> pure (Weighted rw))
+               <|> ((put rState >> rm) `weightedInterleave'` (put lState >> reflect l))
+        (l, r) -> (put lState >> reflect l) `weightedInterleave'` (put rState >> reflect r)
+
+order :: (MonadState s m, MonadLogic m, Ord w)
+      => (s, s)
+      -> (Step w r a, m (Step w r a))
+      -> (Step w r a, m (Step w r a))
+      -> m (Step w r a)
+order (lState, rState) (a, am) (b, bm) =
+    ((put lState >> pure a) <|> am) `weightedInterleave'` (put rState >> pure b <|> bm)
 
 runAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe (r, s))
-runAStarT (AStarT m) s = fmap (fmap fst) . observeT . msplit $ do
+runAStarT (AStarT m) s = fmap listToMaybe . observeManyT 1 $ do
     runStateT m s >>= \case
       (Solved a, s) -> return (a, s)
       _ -> empty
@@ -99,11 +111,19 @@ runAStarT (AStarT m) s = fmap (fmap fst) . observeT . msplit $ do
 runAStar :: AStar s w r a -> s -> Maybe (r, s)
 runAStar m s = runIdentity $ runAStarT  m s
 
-debugAStar :: AStar s w r a -> s -> (Maybe (r, s))
-debugAStar m s = runIdentity $ debugAStarT m s
+execAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe s)
+execAStarT m s = fmap snd <$> runAStarT m s
 
-debugAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe (r, s))
-debugAStarT m s = astarWhile (const True) m s
+evalAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe r)
+evalAStarT m s = fmap fst <$> runAStarT m s
+
+tryWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> AStarT s w r m a
+tryWhile p (AStarT m) = AStarT $ do
+    m >>= \case
+      (Weighted w) | p w -> pure (Weighted w)
+                   | otherwise -> empty
+      x -> pure x
+
 
 astarWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m (Maybe (r, s))
 astarWhile p m s = do
