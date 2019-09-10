@@ -7,7 +7,6 @@
 import Control.Monad.AStar
 import Test.Hspec hiding (Arg)
 import Data.Foldable
-import Data.Semigroup
 import Control.Lens hiding (Context)
 import Control.Monad.State
 import Control.Applicative
@@ -24,17 +23,6 @@ data Context =
 
 makeLenses ''Context
 
-argFirst :: Arg a b -> a
-argFirst (Arg a _) = a
-
-argSecond :: Arg a b -> b
-argSecond (Arg _ b) = b
-
-mapWeight :: (w -> x) -> Step w r a -> Step x r a
-mapWeight f (Weighted w) = Weighted $ f w
-mapWeight _ (Solved r) = Solved r
-mapWeight _ (Pure a) = Pure a
-
 main :: IO ()
 main = hspec $ do
     describe "a-star" $ do
@@ -47,16 +35,18 @@ main = hspec $ do
         it "should take the shortest path in long situations" $ do
             (length . view moves . snd <$> runAStar findN (Context (4, 6) (20, 20) []))
               `shouldBe` Just 30
-    describe "a-star" $ do
+    describe "tryWhile" $ do
         it "should stop if weight gets too high" $ do
-            shouldBe
-              do fst . flip runAStarT () . tryWhile (< 2) $ do
+              -- Use tuple monad to see how far we get
+              do flip (tryWhile (< 4)) () $ do
                     asum [ updateCost (10 :: Int) >> lift ([10], ()) >> empty
                           , updateCost (1 :: Int) >> lift ([1], ()) >> empty
-                          , updateCost (5 :: Int) >> lift ([5], ()) >> done ()
+                          , updateCost (5 :: Int) >> lift ([5], ()) >> empty
                           , updateCost (3 :: Int) >> lift ([3], ()) >> empty
                          ]
-              ([1, 2] :: [Int])
+            `shouldBe`
+              ([1, 3] :: [Int], Nothing :: Maybe ((), ()))
+
 
 distanceTo :: (Int, Int) -> (Int, Int) -> Int
 distanceTo (x, y) (x', y') = abs (x - x') + abs (y - y')

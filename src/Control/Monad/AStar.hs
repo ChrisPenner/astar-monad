@@ -117,21 +117,21 @@ execAStarT m s = fmap snd <$> runAStarT m s
 evalAStarT :: (Monad m) => AStarT s w r m a -> s -> m (Maybe r)
 evalAStarT m s = fmap fst <$> runAStarT m s
 
-tryWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> AStarT s w r m a
-tryWhile p (AStarT m) = AStarT $ do
-    m >>= \case
-      (Weighted w) | p w -> pure (Weighted w)
-                   | otherwise -> empty
-      x -> pure x
+-- tryWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> AStarT s w r m a
+-- tryWhile p (AStarT m) = AStarT $ do
+--     m >>= \case
+--       (Weighted w) | p w -> pure (Weighted w)
+--                    | otherwise -> empty
+--       x -> pure x
 
 
-astarWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m (Maybe (r, s))
-astarWhile p m s = do
+tryWhile :: Monad m => (w -> Bool) -> AStarT s w r m a -> s -> m (Maybe (r, s))
+tryWhile p m s = do
     stepAStar m s >>= \case
       Nothing -> return Nothing
-      Just ((Pure _, s), continue) -> astarWhile p continue s
+      Just ((Pure _, s), continue) -> tryWhile p continue s
       Just ((Weighted w, s), continue) ->
-          if p w then astarWhile p continue s
+          if p w then tryWhile p continue s
                  else return Nothing
       Just ((Solved r, s), _) -> return (Just (r, s))
 
