@@ -3,6 +3,9 @@ Module      : Control.Monad.AStar
 Description : Provides a monad transformer for A* search. See README for details and examples.
 Copyright   : (c) Chris Penner, 2019
 License     : BSD3
+
+See the <https://github.com/chrispenner/astar-monad README> for usage info and examples.
+
 -}
 
 {-# LANGUAGE DeriveFunctor #-}
@@ -58,8 +61,13 @@ type AStar s c r a = AStarT s c r Identity a
 -- @c@: Cost measure: The type you'll use for determining the estimated cost of following a given
 -- branch. Usually requires 'Ord'.
 --
--- @r@: "Result" type, this is often redundant to State but is provided for convenience.
+-- @r@: Result type, this is often redundant to State but is provided for convenience.
 -- This is the type you pass to 'done' when you've found a solution.
+--
+-- @m@: An arbitrary monad which will be threaded through.
+--
+-- Be wary that effects will be run in seemingly non-deterministic ordering as we switch
+-- chaotically between branches.
 newtype AStarT s c r m a =
     AStarT { unAStarT :: StateT s (LogicT m) (Step c r a)
           } deriving stock Functor
