@@ -22,6 +22,8 @@ module Control.Monad.AStar
 
     -- * Methods
     , MonadAStar(..)
+    , branch
+    , failure
 
     -- * Executing Search
     , runAStarT
@@ -198,6 +200,5 @@ stepAStar (AStarT m) s = fmap (fmap go) . observeT . (fmap . fmap . fmap . fmap)
     go (v, x) = (v, AStarT (lift x))
 
 instance (Ord w, Monad m) => MonadAStar w r (AStarT s w r m) where
-  branch = (<|>)
   updateCost c = AStarT $ pure (Weighted c) <|> return (Pure ())
   done = AStarT . pure . Solved
