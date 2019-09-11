@@ -110,7 +110,6 @@ instance (Monad m, Ord c) => Monad (AStarT s c r m) where
         Just (Weighted c, continue) -> do
             reflect $ Just (Weighted c, unAStarT $ AStarT continue >>= f)
 
--- ??
 -- instance (Ord c, Monad m) => MonadLogic (AStarT s c r m) where
 --   msplit (AStarT (StateT m)) = AStarT . StateT $ \s -> do
 --       msplit (m s) >>= \case
@@ -143,7 +142,10 @@ weightedInterleave' ma mb = do
           | otherwise ->
               (put rState >> pure (Weighted rw))
                <|> ((put rState >> rm) `weightedInterleave'` (put lState >> reflect l))
-        (l, r) -> (put lState >> reflect l) `weightedInterleave'` (put rState >> reflect r)
+        ((Just (Pure la, lm)), r) ->
+            (put lState >> pure (Pure la)) `interleave` ((put lState >> lm) `weightedInterleave'` (put rState >> reflect r))
+        (l, (Just (Pure ra, rm))) ->
+            (put rState >> pure (Pure ra)) `interleave` ((put rState >> rm) `weightedInterleave'` (put lState >> reflect l))
 
 -- | Run an A* computation effect returning the solution and branch state if one was found.
 runAStarT :: (Monad m) => AStarT s c r m a -> s -> m (Maybe (r, s))

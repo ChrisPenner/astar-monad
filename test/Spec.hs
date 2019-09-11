@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TypeApplications #-}
 import Control.Monad.AStar
 import Test.Hspec hiding (Arg)
 import Data.Foldable
@@ -40,10 +41,18 @@ main = hspec $ do
         --             asum [ updateCost (1 :: Int) >> modify (++ [1]) >> updateCost 10 >> modify (++ [10])
         --                  , updateCost (2 :: Int) >> modify (++ [2]) >> done ()
         --                  ]
-        it "should resolve with Nothing if all branches simply return" $ do
-              do flip runAStar [] $ (updateCost 1 >> return ()) <|> return ()
+        it "should resolve with Nothing if branches return after updating cost" $ do
+              do flip evalAStar () $ (updateCost @Int 1 >> return ()) <|> return ()
             `shouldBe`
-              Just ((), [2 :: Int])
+              (Nothing :: Maybe ())
+        it "should resolve with solution if some branches simply return" $ do
+              do flip evalAStar () $ (return () <|> (updateCost @Int 1 >> done ()))
+            `shouldBe`
+              Just ()
+        it "should resolve with solution if all branches simply return" $ do
+              do flip evalAStar () $ (return () <|> return () :: AStar () () () ())
+            `shouldBe`
+              Nothing
     describe "tryWhile" $ do
         it "should stop if weight gets too high" $ do
               -- Use tuple monad to see how far we get
