@@ -3,6 +3,8 @@ A\* Monad
 
 [Hackage](http://hackage.haskell.org/package/astar-monad)
 
+**Caveat Emptor**; this hasn't been *battle-tested* yet; it should work, but make sure to test it out if you're doing anything serious.
+
 Easily do A\* searches with use of arbitrary monadic effects!
 
 ## Basics
@@ -73,3 +75,8 @@ Just (Context { _current = (7, 4)
               , _moves   = [U, R, R]
               })
 ```
+
+
+## Known Issues
+
+Currently, computation will **hang** if the end of a branch "finishes" without calling `done` or `failure`; so don't do that.

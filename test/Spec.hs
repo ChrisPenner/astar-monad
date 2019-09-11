@@ -35,6 +35,15 @@ main = hspec $ do
         it "should take the shortest path in long situations" $ do
             (length . view moves . snd <$> runAStar findPoint (Context (4, 6) (20, 20) []))
               `shouldBe` Just 30
+        -- it "should properly rewind state" $ do
+        --       do flip execAStar [] $ do
+        --             asum [ updateCost (1 :: Int) >> modify (++ [1]) >> updateCost 10 >> modify (++ [10])
+        --                  , updateCost (2 :: Int) >> modify (++ [2]) >> done ()
+        --                  ]
+        it "should resolve with Nothing if all branches simply return" $ do
+              do flip runAStar [] $ (updateCost 1 >> return ()) <|> return ()
+            `shouldBe`
+              Just ((), [2 :: Int])
     describe "tryWhile" $ do
         it "should stop if weight gets too high" $ do
               -- Use tuple monad to see how far we get

@@ -110,6 +110,14 @@ instance (Monad m, Ord c) => Monad (AStarT s c r m) where
         Just (Weighted c, continue) -> do
             reflect $ Just (Weighted c, unAStarT $ AStarT continue >>= f)
 
+-- ??
+-- instance (Ord c, Monad m) => MonadLogic (AStarT s c r m) where
+--   msplit (AStarT (StateT m)) = AStarT . StateT $ \s -> do
+--       msplit (m s) >>= \case
+--         (Just ((Weighted w, s), continue)) -> return (Weighted w, s)
+--         (Just ((stp, s), continue)) -> return (_, s)
+--         Nothing -> return $ (Pure Nothing, s)
+
 instance (Ord c, Monad m) => Alternative (AStarT s c r m) where
   empty = AStarT empty
   (<|>) = weightedInterleave
@@ -181,6 +189,7 @@ tryWhileT p m s = do
                  else return Nothing
       Just ((Solved r, s), _) -> return (Just (r, s))
 
+-- NOTE probably doesn't handle state properly in returned continuation...
 stepAStar :: (Monad m) => AStarT s c r m a -> s -> m (Maybe ((Step c r a, s), AStarT s c r m a))
 stepAStar (AStarT m) s = fmap (fmap go) . observeT . (fmap . fmap . fmap . fmap) fst $ msplit (runStateT m s)
   where
