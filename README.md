@@ -75,8 +75,3 @@ Just (Context { _current = (7, 4)
               , _moves   = [U, R, R]
               })
 ```
-
-
-## Known Issues
-
-Currently, computation will **hang** if the end of a branch "finishes" without calling `done` or `failure`; so don't do that.

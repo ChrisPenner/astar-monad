@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9b0da561d4a2aab07a5b16f423b1a711563fb04085433460b4f91879142f5f9b
+-- hash: dd7ab531bbfc60dd1505d0488c11c684b9259708a61f021be586d938d7d5d5a8
 
 name:           astar-monad
-version:        0.1.0.0
+version:        0.2.0.0
 description:    Please see the README on GitHub at <https://github.com/ChrisPenner/astar-monad#readme>
 homepage:       https://github.com/ChrisPenner/astar-monad#readme
 bug-reports:    https://github.com/ChrisPenner/astar-monad/issues
