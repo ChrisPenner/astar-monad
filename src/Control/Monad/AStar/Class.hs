@@ -19,10 +19,12 @@ import Control.Applicative
 -- > It should branch respecting costs using `<|>` from its 'Alternative' instance.
 -- > (updateCost 2 >> mx) <|> (updateCost 1 >> my) == mx <|> my
 
-class (MonadPlus m) => MonadAStar w r m | m -> r, m -> w where
-  -- | Update the cost estimate of the current branch and re-evaluate available branches,
-  -- switching to a cheaper one when appropriate.
-  updateCost :: w -> m ()
+class (MonadPlus m) => MonadAStar c r m | m -> r, m -> c where
+  -- | ADD to your current branch's CUMULATIVE cost. May cause a branch switch.
+  spend :: c -> m ()
+
+  -- | SET the current branch's BEST-CASE-COST cost. May cause a branch switch.
+  estimate :: c -> m ()
 
   -- | Return a solution and short-circuit any remaining branches.
   done :: r -> m a
@@ -30,11 +32,11 @@ class (MonadPlus m) => MonadAStar w r m | m -> r, m -> w where
 -- | Branch the search.
 --
 -- > branch == (<|>)
-branch :: MonadAStar w r m => m a -> m a -> m a
+branch :: MonadAStar c r m => m a -> m a -> m a
 branch = (<|>)
 
 -- | Fail the current branch.
 --
 -- > branch == empty
-failure :: MonadAStar w r m => m a
+failure :: MonadAStar c r m => m a
 failure = empty
