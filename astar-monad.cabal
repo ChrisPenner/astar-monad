@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7460bc421588132be13b6817bff684eef35d40e33ca2e5eec46b73dad51a222e
+-- hash: 27146e4fdc88826ce579610bb3563ed7f12aef2105b59cad2fd38d71a7e47885
 
 name:           astar-monad
 version:        0.3.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Control.Monad.AStar
       Control.Monad.AStar.Class
+      Control.Monad.AStar.LogicState
   other-modules:
       Paths_astar_monad
   hs-source-dirs:
@@ -37,6 +38,7 @@ library
   build-depends:
       base >=4.7 && <5
     , logict
+    , logict-state
     , mtl
   default-language: Haskell2010
 
@@ -54,5 +56,6 @@ test-suite astar-monad-test
     , hspec
     , lens
     , logict
+    , logict-state
     , mtl
   default-language: Haskell2010
