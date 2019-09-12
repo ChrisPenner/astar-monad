@@ -162,15 +162,19 @@ runAStarT (AStarT m) s = fmap listToMaybe . observeManyT 1 $ do
           (Solved r, s) -> return (r, branchState s)
           _ -> empty
 
+-- | Like 'runAStar' but returns only the result
 evalAStar :: (Monoid c) => AStar s c r a -> s -> Maybe r
 evalAStar m s = fst <$> runAStar m s
 
+-- | Like 'runAStarT' but returns only the result
 evalAStarT :: (Monad m, Monoid c) => AStarT s c r m a -> s -> m (Maybe r)
 evalAStarT m s = fmap fst <$> runAStarT m s
 
+-- | Like 'runAStar' but returns only the state
 execAStar :: (Monoid c) => AStar s c r a -> s -> Maybe s
 execAStar m s = fmap snd $ runAStar m s
 
+-- | Like 'execAStarT' but returns only the state
 execAStarT :: (Monad m, Monoid c) => AStarT s c r m a -> s -> m (Maybe s)
 execAStarT m s = fmap snd <$> runAStarT m s
 
