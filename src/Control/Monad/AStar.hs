@@ -183,4 +183,5 @@ stepAStar (AStarT m) s = fmap (fmap go) . observeT . (fmap . fmap . fmap . fmap)
 instance (Ord c, Monoid c, Monad m) => MonadAStar c r (AStarT s c r m) where
   estimate c = AStarT $ modify (\bs -> bs{estimateTillDone=c}) >> (pure Checkpoint <|> pure (Pure ()))
   spend c = AStarT $ modify (\bs -> bs{cumulativeCost=cumulativeCost bs <> c}) >> (pure Checkpoint <|> pure (Pure ()))
+  -- estimateAndSpend spnd est = AStarT $ modify (\bs -> bs{cumulativeCost=cumulativeCost bs <> spnd, estimateTillDone=est}) >> (pure Checkpoint <|> pure (Pure ()))
   done = AStarT . pure . Solved

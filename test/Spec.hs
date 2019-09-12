@@ -6,7 +6,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TypeApplications #-}
 import Control.Monad.AStar
-import Test.Hspec hiding (Arg)
+import Test.Hspec hiding (Arg, context)
 import Data.Foldable
 import Control.Lens hiding (Context)
 import Control.Monad.State
@@ -20,22 +20,26 @@ data Context =
     Context { _current :: (Int, Int)
             , _goal    :: (Int, Int)
             , _moves   :: [Move]
+            , _locations   :: [(Int, Int)]
             }
     deriving (Show, Eq)
 
 makeLenses ''Context
 
+context :: (Int, Int) -> (Int, Int) -> Context
+context start goal = Context start goal [] []
+
 main :: IO ()
 main = hspec $ do
     describe "a-star" $ do
         it "should find a solution" $ do
-            (fst <$> runAStar findPoint (Context (3, 6) (5, 5) []))
+            (fst <$> runAStar findPoint (context (3, 6) (5, 5)))
               `shouldBe` Just (5, 5)
         it "should take the shortest path" $ do
-            (view moves . snd <$> runAStar findPoint (Context (4, 6) (5, 5) []))
+            (view moves . snd <$> runAStar findPoint (context (4, 6) (5, 5)))
               `shouldBe` Just [R, U]
         it "should take the shortest path in long situations" $ do
-            (length . view moves . snd <$> runAStar findPoint (Context (4, 6) (20, 20) []))
+            (length . view moves . snd <$> runAStar findPoint (context (4, 6) (20, 20)))
               `shouldBe` Just 30
         -- it "should properly rewind state" $ do
         --       do flip runAStar [] $ do
@@ -71,10 +75,10 @@ distanceTo :: (Int, Int) -> (Int, Int) -> Int
 distanceTo (x, y) (x', y') = abs (x - x') + abs (y - y')
 
 move :: Monad m => Move -> AStarT Context (Sum Int) r m ()
-move L = moves <>= [L] >> current . _1 -= 1 >> spend 1
-move R = moves <>= [R] >> current . _1 += 1 >> spend 1
-move U = moves <>= [U] >> current . _2 -= 1 >> spend 1
-move D = moves <>= [D] >> current . _2 += 1 >> spend 1
+move L = moves <>= [L] >> current . _1 -= 1
+move R = moves <>= [R] >> current . _1 += 1
+move U = moves <>= [U] >> current . _2 -= 1
+move D = moves <>= [D] >> current . _2 += 1
 
 findPoint :: AStar Context (Sum Int) (Int, Int) ()
 findPoint = do
@@ -87,4 +91,27 @@ findPoint = do
         , move R >> findPoint
         , move U >> findPoint
         , move D >> findPoint
+        ]
+
+
+mineField :: AStarT Context (Sum Int) (Int, Int) IO ()
+mineField = do
+    spend 1
+    spend 1
+    spend 1
+    spend 1
+    spend 1
+    spend 1
+    (x, y) <- use current
+    locations <>= [(x, y)]
+    gl <- use goal
+    when ((x, y) == gl) $ done gl
+    -- if (odd $ x * y) then spend 10
+    --                  else spend 1
+    estimate . Sum $ distanceTo gl (x, y)
+    asum
+        [ move L >> mineField
+        , move R >> mineField
+        , move U >> mineField
+        , move D >> mineField
         ]
