@@ -26,15 +26,6 @@ class (MonadPlus m, Monoid c) => MonadAStar c r m | m -> r, m -> c where
   -- | SET the current branch's BEST-CASE-COST cost. May cause a branch switch.
   estimate :: c -> m ()
 
-  ---- | Perform a spend and estimate the heuristic at the same time
-  ----
-  ---- If you need to do both 'spend' and 'estimate' this is usually more efficient.
-  ---- Every update to the branches cost causes expensive branch switching.
-  --estimateAndSpend :: c  -- ^ Amount to 'estimate'
-  --                 -> c -- ^ Amount to 'spend'
-  --                 -> m ()
-  --estimateAndSpend est spnd = estimate est >> spend spnd
-
   -- | Return a solution and short-circuit any remaining branches.
   done :: r -> m a
 

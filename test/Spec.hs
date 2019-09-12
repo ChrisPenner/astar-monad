@@ -17,10 +17,10 @@ data Move = U | D | L | R
     deriving (Show, Eq)
 
 data Context =
-    Context { _current :: (Int, Int)
-            , _goal    :: (Int, Int)
-            , _moves   :: [Move]
-            , _locations   :: [(Int, Int)]
+    Context { _current   :: (Int, Int)
+            , _goal      :: (Int, Int)
+            , _moves     :: [Move]
+            , _locations :: [(Int, Int)]
             }
     deriving (Show, Eq)
 
@@ -61,11 +61,11 @@ main = hspec $ do
     -- describe "tryWhile" $ do
     --     it "should stop if weight gets too high" $ do
     --           -- Use tuple monad to see how far we get
-    --           do flip (tryWhileT (< 4)) () $ do
-    --                 asum [ estimate (10 :: Int) >> lift ([10], ()) >> empty
-    --                       , estimate (1 :: Int) >> lift ([1], ()) >> empty
-    --                       , estimate (5 :: Int) >> lift ([5], ()) >> empty
-    --                       , estimate (3 :: Int) >> lift ([3], ()) >> empty
+    --           do flip (tryWhileT (const (< 4))) () $ do
+    --                 asum [ estimate (10 :: Sum Int) >> lift ([10], ()) >> empty
+    --                       , estimate (1 :: Sum Int) >> lift ([1], ()) >> empty
+    --                       , estimate (5 :: Sum Int) >> lift ([5], ()) >> empty
+    --                       , estimate (3 :: Sum Int) >> lift ([3], ()) >> empty
     --                      ]
     --         `shouldBe`
     --           ([1, 3] :: [Int], Nothing :: Maybe ((), ()))
@@ -93,15 +93,30 @@ findPoint = do
         , move D >> findPoint
         ]
 
+-- To make things more interesting we'll say that moving through coordinates
+-- where either 'x' or 'y' are divisible by the other is 3X more expensive!
+addCost :: MonadAStar (Sum Int) r m => (Int, Int) -> m ()
+-- Don't divide by zero!
+addCost (0, _) = spend 1
+addCost (_, 0) = spend 1
+addCost (x, y)
+    | mod x y == 0 || mod y x == 0 = spend 3
+addCost _ = spend 1
 
-mineField :: AStarT Context (Sum Int) (Int, Int) IO ()
+
+mineField :: AStar Context (Sum Int) (Int, Int) ()
 mineField = do
+    -- Get the current position
     (x, y) <- use current
+    -- Add the current location to our list
     locations <>= [(x, y)]
+    -- If we're at the goal we're done!
     gl <- use goal
-    when ((x, y) == gl) $ done gl
-    if (x == y) then spend 10
-                else spend 1
+    when ((x, y) == gl)
+      $ done gl
+    -- Add the cost of the current position
+    addCost (x, y)
+    -- Estimate steps to completion
     estimate . Sum $ distanceTo gl (x, y)
     asum
         [ move L >> mineField
