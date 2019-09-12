@@ -111,10 +111,11 @@ instance (Monad m, Semigroup c, Ord c) => Monad (AStarT s c r m) where
       bs <- get
       case next of
           Nothing -> empty
-          (Just (Solved r, _)) -> put bs >> pure (Solved r)
-          (Just (Pure a, continue)) -> unAStarT $ (f a) `weightedInterleave` (AStarT continue >>= f)
+          (Just (Solved r, _)) -> pure (Solved r)
+          -- Should I interleave these instead?
+          (Just (Pure a, continue)) -> (unAStarT $ f a) <|> unAStarT (AStarT continue >>= f)
           (Just (Checkpoint, continue)) ->
-                reflect $ Just (Checkpoint, unAStarT $ AStarT continue >>= f)
+                pure Checkpoint <|> unAStarT (AStarT continue >>= f)
 
 instance (Ord c, Monad m, Semigroup c) => Alternative (AStarT s c r m) where
   empty = AStarT empty

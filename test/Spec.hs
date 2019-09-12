@@ -96,18 +96,12 @@ findPoint = do
 
 mineField :: AStarT Context (Sum Int) (Int, Int) IO ()
 mineField = do
-    spend 1
-    spend 1
-    spend 1
-    spend 1
-    spend 1
-    spend 1
     (x, y) <- use current
     locations <>= [(x, y)]
     gl <- use goal
     when ((x, y) == gl) $ done gl
-    -- if (odd $ x * y) then spend 10
-    --                  else spend 1
+    if (x == y) then spend 10
+                else spend 1
     estimate . Sum $ distanceTo gl (x, y)
     asum
         [ move L >> mineField
