@@ -3,6 +3,8 @@ A\* Monad
 
 [Hackage](http://hackage.haskell.org/package/astar-monad)
 
+**I strongly recommend using [Dijkstra Monad](https://github.com/ennocramer/monad-dijkstra) instead**.
+
 **Caveat Emptor**; this hasn't been *battle-tested* yet; it should work, but make sure to test it out if you're doing anything serious.
 
 Easily do [A\* searches](https://en.wikipedia.org/wiki/A*_search_algorithm) with use of arbitrary monadic effects!
@@ -13,7 +15,7 @@ Easily do [A\* searches](https://en.wikipedia.org/wiki/A*_search_algorithm) with
 ## Basics
 
 * Use `<|>` or `asum` (anything using `Alternative`) to branch into multiple possible choices.
-* Use `estimate myCost` to **set** the value of your 'heuristic' function for the current branch. Do this whenever you've done enough work to change your estimate.  Remember that A\* heuristics should always be pessimistic (e.g. can over-estimate cost, but shouldn't UNDER estimate). 
+* Use `estimate myCost` to **set** the value of your 'heuristic' function for the current branch. Do this whenever you've done enough work to change your estimate.  Remember that A\* heuristics should always be optimistic (e.g. can under-estimate cost, but shouldn't ever over-estimate). 
 * Use `spend myCost` to **add** a cost to the branch's CUMULATIVE cost. Do this when some cost has been incurred, e.g. we've moved the state from one node to another.
 * Every call to `spend` or `estimate` creates a branch; Branches with LOWER costs will run before those with higher costs. Note that this branching is expensive, so try to consolidate calls to these functions in your actions when possible.
 * Call `done mySolution` to short circuit ALL running branches and immediately return your result.
