@@ -1,7 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Control.Monad.AStar.Class (MonadAStar(..), branch, failure) where
-import Control.Monad
 import Control.Applicative
 
 -- | A class which represents the ability to do A* search.
@@ -19,7 +18,7 @@ import Control.Applicative
 -- > It should branch respecting costs using `<|>` from its 'Alternative' instance.
 -- > (updateCost 2 >> mx) <|> (updateCost 1 >> my) == mx <|> my
 
-class (MonadPlus m, Monoid c) => MonadAStar c r m | m -> r, m -> c where
+class (Alternative m, Monoid c) => MonadAStar c r m | m -> r, m -> c where
   -- | ADD to your current branch's CUMULATIVE cost. May cause a branch switch.
   spend :: c -> m ()
 

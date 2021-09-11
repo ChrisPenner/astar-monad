@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7460bc421588132be13b6817bff684eef35d40e33ca2e5eec46b73dad51a222e
+-- hash: fbaac768151af878d461d713cdb1792f1a1d4fefc4aab2170ac281513aa738c6
 
 name:           astar-monad
 version:        0.3.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Control.Monad.AStar
       Control.Monad.AStar.Class
+      Control.Monad.AStarCont
   other-modules:
       Paths_astar_monad
   hs-source-dirs:
@@ -38,6 +39,8 @@ library
       base >=4.7 && <5
     , logict
     , mtl
+    , psqueues
+    , transformers
   default-language: Haskell2010
 
 test-suite astar-monad-test
@@ -55,4 +58,6 @@ test-suite astar-monad-test
     , lens
     , logict
     , mtl
+    , psqueues
+    , transformers
   default-language: Haskell2010

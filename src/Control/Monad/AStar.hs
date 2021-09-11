@@ -42,7 +42,6 @@ module Control.Monad.AStar
 
 import Control.Monad.AStar.Class
 import Control.Monad.Except
-import Control.Monad.Fail
 import Control.Monad.Logic
 import Control.Applicative
 import Control.Monad.State
