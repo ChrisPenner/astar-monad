@@ -17,9 +17,7 @@ import Control.Monad.State
 import Data.IntPSQ as PSQ
 import Control.Monad.Trans.Cont
 import Control.Applicative as Alt
-import Data.Foldable
 import Control.Monad.Identity
-import Data.Monoid
 
 tick :: MonadState Int m => m Int
 tick = do
@@ -29,67 +27,68 @@ tick = do
 
 type Q c v = IntPSQ c v
 
+data Resume c m r =
+    Resume c (m (Resume c m r))
+      | Done r
+      | Dead
+
 newtype AStarT r c m a =
-    AStarT {unwrapAStarT :: (ContT (Maybe r) (StateT (Q c (AStarT r c m (Maybe r))) (ReaderT c (StateT Int m))) a)}
+    AStarT {unwrapAStarT :: ReaderT c (ContT (Resume c m r) m) a}
     deriving newtype (Functor, Applicative, Monad)
 
-instance (Monad m) => Alternative (AStarT r c m) where
-  empty = AStarT $ do
-      shiftT $ \_cc -> do
-          pure Nothing
+instance (Monad m, Ord c) => Alternative (AStarT r c m) where
+  empty = AStarT . lift . shiftT $ \_cc -> do
+         pure Dead
   AStarT l <|> AStarT r = AStarT $ do
-      shiftT $ \cc -> do
-        let x = runContT l cc
-        let y = runContT r cc
-        _
-
-
-      -- AStarT $ do
-      -- shiftT $ \cc -> do
-      --     a <- l
-      --     rl <- lift $ cc a
-      --     b <- r
-      --     rr <- lift $ cc b
-      --     pure (rl <|> rr)
+      c <- ask
+      lift . shiftT $ \cc -> do
+          ll <- resetT $ runReaderT l c >>= lift . cc
+          lr <- resetT $ runReaderT r c >>= lift . cc
+          case (ll, lr) of
+            (Done r, _) -> pure (Done r)
+            (_, Done r) -> pure (Done r)
+            (Dead, Dead) -> shiftT $ \_cc -> pure Dead
+            (Resume _ actL, Dead) ->
+                lift $ actL
+            (Dead, Resume _ actR) ->
+                lift $ actR
+            (resL@(Resume cl actL), resR@(Resume cr actR)) ->
+                if cl <= cr then flip runReaderT c $ unwrapAStarT (AStarT (lift . lift $ actL) <|> pure resR)
+                            else flip runReaderT c $ unwrapAStarT (AStarT (lift . lift $ actR) <|> pure resL)
 
 instance (Monoid c, Ord c, Monad m) => MonadAStar c r (AStarT r c m) where
-  spend c = AStarT $ shiftT $ \cc -> do
-      unwrapAStarT $ next c (AStarT . lift $ cc ())
-  estimate c = AStarT $ local (const c) . unwrapAStarT $ spend mempty
-  done r = AStarT $ shiftT $ \_cc -> do
-      pure (Just r)
+  spend c = do
+      cost <- AStarT $ ask
+      AStarT . lift $ shiftT $ \cc -> do
+        pure $ Resume (cost <> c) (cc ())
+  -- estimate c = AStarT $ local (const c) . unwrapAStarT $ spend mempty
+  estimate c = undefined
+  done r = AStarT . lift $ shiftT $ \_cc -> do
+      pure (Done r)
 
-stash :: (Semigroup c, Ord c, Monad m) => c -> AStarT r c m (Maybe r) -> AStarT r c m ()
-stash c cc = AStarT $ do
-  n <- lift . lift $ tick
-  p <- asks (<> c)
-  modify (PSQ.insert n p cc)
+-- stash :: (Semigroup c, Ord c, Monad m) => c -> AStarT r c m (Maybe r) -> AStarT r c m ()
+-- stash c cc = AStarT $ do
+--   n <- lift . lift $ tick
+--   p <- asks (<> c)
+--   modify (PSQ.insert n p cc)
 
-next :: (Monad m, Semigroup c, Ord c) => c -> AStarT r c m (Maybe r) -> AStarT r c m (Maybe r)
-next c cc = do
-    stash c cc
-    q <- AStarT $ get
-    let (result, newQ) = flip alterMin q $ \case
-                            Just (_, _, nextAction) -> (nextAction, Nothing)
-                            Nothing -> (pure Nothing, Nothing)
-    AStarT $ put newQ
-    result
+-- next :: (Monad m, Semigroup c, Ord c) => c -> AStarT r c m (Maybe r) -> AStarT r c m (Maybe r)
+-- next c cc = do
+--     stash c cc
+--     q <- AStarT $ get
+--     let (result, newQ) = flip alterMin q $ \case
+--                             Just (_, _, nextAction) -> (nextAction, Nothing)
+--                             Nothing -> (pure Nothing, Nothing)
+--     AStarT $ put newQ
+--     result
 
-runAStar :: Monoid c => AStarT r c Identity r -> Maybe r
-runAStar (AStarT m) =
-      runIdentity
-    . flip evalStateT 0
-    . flip runReaderT mempty
-    . flip evalStateT PSQ.empty
-    . flip runContT (pure . pure)
-    $ m
+runAStar :: Monoid c => AStarT r c Identity r -> Resume c Identity r
+runAStar = runIdentity . runAStarT
 
-runAStarT :: (Monad m, Monoid c) => AStarT r c m r -> m (Maybe r)
+runAStarT :: (Monad m, Monoid c) => AStarT r c m r -> m (Resume c m r)
 runAStarT (AStarT m) =
-      flip evalStateT 0
+      flip runContT (pure . Done)
     . flip runReaderT mempty
-    . flip evalStateT PSQ.empty
-    . flip runContT (pure . pure)
     $ m
 
 -- tester :: AStarT Int (Sum Int) Identity x
