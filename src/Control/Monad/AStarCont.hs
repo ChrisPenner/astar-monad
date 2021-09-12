@@ -18,6 +18,8 @@ import Data.IntPSQ as PSQ
 import Control.Monad.Trans.Cont
 import Control.Applicative as Alt
 import Control.Monad.Identity
+import Data.Monoid
+import Data.Foldable
 
 tick :: MonadState Int m => m Int
 tick = do
@@ -34,13 +36,21 @@ data Resume c m r =
 
 newtype AStarT r c m a =
     AStarT {unwrapAStarT :: ReaderT c (ContT (Resume c m r) m) a}
-    deriving newtype (Functor, Applicative, Monad)
+    deriving newtype (Functor, Applicative, Monad, MonadIO)
 
 instance (Monad m, Ord c) => Alternative (AStarT r c m) where
   empty = AStarT . lift . shiftT $ \_cc -> do
          pure Dead
-  AStarT l <|> AStarT r = AStarT $ do
-      c <- ask
+  AStarT l <|> AStarT r = do
+      c <- AStarT $ ask
+      loop c l r
+
+loop :: (Monad m, Ord c) =>
+  c
+  -> ReaderT c (ContT (Resume c m r) m) a
+  -> ReaderT c (ContT (Resume c m r) m) a
+  -> AStarT r c m a
+loop c l r = AStarT $ do
       lift . shiftT $ \cc -> do
           ll <- resetT $ runReaderT l c >>= lift . cc
           lr <- resetT $ runReaderT r c >>= lift . cc
@@ -59,7 +69,7 @@ instance (Monad m, Ord c) => Alternative (AStarT r c m) where
 instance (Monoid c, Ord c, Monad m) => MonadAStar c r (AStarT r c m) where
   spend c = do
       cost <- AStarT $ ask
-      AStarT . lift $ shiftT $ \cc -> do
+      AStarT . local (<> c) $ lift $ shiftT $ \cc -> do
         pure $ Resume (cost <> c) (cc ())
   -- estimate c = AStarT $ local (const c) . unwrapAStarT $ spend mempty
   estimate c = undefined
@@ -82,16 +92,34 @@ instance (Monoid c, Ord c, Monad m) => MonadAStar c r (AStarT r c m) where
 --     AStarT $ put newQ
 --     result
 
-runAStar :: Monoid c => AStarT r c Identity r -> Resume c Identity r
+loop1 :: Monad m => Resume c m r -> m (Maybe r)
+loop1 = \case
+  Done r -> pure (Just r)
+  Dead -> pure Nothing
+  Resume _ act -> act >>= loop1
+
+runAStar :: Monoid c => AStarT r c Identity r -> Maybe r
 runAStar = runIdentity . runAStarT
 
-runAStarT :: (Monad m, Monoid c) => AStarT r c m r -> m (Resume c m r)
-runAStarT (AStarT m) =
-      flip runContT (pure . Done)
-    . flip runReaderT mempty
-    $ m
+runAStarT :: (Monad m, Monoid c) => AStarT r c m r -> m (Maybe r)
+runAStarT (AStarT m) = do
+    unwrapped <- flip runContT (pure . Done)
+                . flip runReaderT mempty
+                $ m
+    loop1 unwrapped
 
--- tester :: AStarT Int (Sum Int) Identity x
--- tester = do
 
-    -- asum [spend 10 *> done 1, spend 10 *> done 2, done 3]
+shower :: Show r => Resume c m r -> [Char]
+shower (Resume _ _) = "Resume"
+shower (Done r) = show r
+shower Dead = "Dead"
+
+tester :: AStarT Int (Sum Int) IO x
+tester = do
+    spend 100
+    asum [spend 10 *> done 1, spend 80 *> printCost *> done 2, spend 20 *> tester]
+
+
+printCost :: Show c => AStarT r c IO ()
+printCost = AStarT ask >>= liftIO . print
+
