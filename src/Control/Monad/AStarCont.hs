@@ -13,21 +13,13 @@ module Control.Monad.AStarCont where
 
 import Control.Monad.AStar.Class
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Monad.Trans.Cont
 import Control.Applicative as Alt
 import Control.Monad.Identity
 import Data.Monoid
-import Debug.Trace (traceM)
-
-tick :: MonadState Int m => m Int
-tick = do
-    n <- get
-    modify succ
-    pure n
 
 data Resume c m r =
-    Resume c (ReaderT c m (Resume c m r))
+    Resume c (m (Resume c m r))
       | Done r
       | Dead
 
@@ -37,43 +29,34 @@ instance (Show c, Show r) => Show (Resume c m r) where
   show (Resume c _) = "Resume " <> show c
 
 newtype AStarT r c m a =
-    AStarT {unwrapAStarT :: (ContT (Resume c m r) (ReaderT c m)) a}
+    AStarT {unwrapAStarT :: (ContT (Resume c (ReaderT c m) r) (ReaderT c m)) a}
     deriving newtype (Functor, Applicative, Monad, MonadIO)
 
-instance (Show c, Show r,  Monad m, Ord c, Semigroup c) => Alternative (AStarT r c m) where
+instance (Monad m, Ord c) => Alternative (AStarT r c m) where
   empty = AStarT . shiftT $ \_cc -> do
          pure Dead
   AStarT l <|> AStarT r = AStarT $ loop l r
 
-loop :: (Monad m, Ord c, Semigroup c, Show c, Show r) =>
-     ContT (Resume c m r) (ReaderT c m) a
-  -> ContT (Resume c m r) (ReaderT c m) a
-  -> ContT (Resume c m r) (ReaderT c m) a
+loop :: (Monad m, Ord c) =>
+     ContT (Resume c m r) m a
+  -> ContT (Resume c m r) m a
+  -> ContT (Resume c m r) m a
 loop l r = do
     shiftT $ \cc -> do
           ll <- resetT $ l >>= lift . cc
           lr <- resetT $ r >>= lift . cc
           case (ll, lr) of
+            (resL@(Resume cl actL), resR@(Resume cr actR)) -> do
+                if cl <= cr then loop (lift $ actL) (pure resR)
+                            else loop (lift $ actR) (pure resL)
             (Done r, _) -> pure (Done r)
             (_, Done r) -> pure (Done r)
-            (Dead, Dead) -> do
-                traceM "empty both"
-                shiftT $ \_cc -> pure Dead
             (r, Dead) -> do
-                traceM "emptyR"
                 pure r
-                -- lift $ actL
             (Dead, r) -> do
-                traceM "emptyL"
                 pure r
-                -- lift $ actR 
-                -- lift $ actR
-            (resL@(Resume cl actL), resR@(Resume cr actR)) -> do
-                traceM $ show (resL, resR)
-                if cl <= cr then traceM "picked L" >> loop (lift $ actL) (pure resR)
-                            else traceM "picked R" >> loop (lift $ actR) (pure resL)
 
-instance (Show r, Monoid c, Ord c, Monad m, Show c) => MonadAStar c r (AStarT r c m) where
+instance (Monoid c, Ord c, Monad m) => MonadAStar c r (AStarT r c m) where
   spend c = do
       AStarT . shiftT $ \cc -> do
         cost <- ask
@@ -83,7 +66,7 @@ instance (Show r, Monoid c, Ord c, Monad m, Show c) => MonadAStar c r (AStarT r 
   done r = AStarT . shiftT $ \_cc -> do
       pure (Done r)
 
-loop1 :: (Monad m, Semigroup c) => Resume c m r -> ReaderT c m (Maybe r)
+loop1 :: (Monad m) => Resume c m r -> m (Maybe r)
 loop1 = \case
   Done r -> pure (Just r)
   Dead -> pure Nothing
