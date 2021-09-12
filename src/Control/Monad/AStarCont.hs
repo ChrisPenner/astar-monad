@@ -14,12 +14,10 @@ module Control.Monad.AStarCont where
 import Control.Monad.AStar.Class
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.IntPSQ as PSQ
 import Control.Monad.Trans.Cont
 import Control.Applicative as Alt
 import Control.Monad.Identity
 import Data.Monoid
-import Data.Foldable
 import Debug.Trace (traceM)
 
 tick :: MonadState Int m => m Int
@@ -27,8 +25,6 @@ tick = do
     n <- get
     modify succ
     pure n
-
-type Q c v = IntPSQ c v
 
 data Resume c m r =
     Resume c (ReaderT c m (Resume c m r))
@@ -60,10 +56,18 @@ loop l r = do
           case (ll, lr) of
             (Done r, _) -> pure (Done r)
             (_, Done r) -> pure (Done r)
-            (Dead, Dead) -> shiftT $ \_cc -> pure Dead
-            (Resume _ actL, Dead) -> lift $ actL
-            (Dead, Resume _ actR) ->
-                lift $ actR
+            (Dead, Dead) -> do
+                traceM "empty both"
+                shiftT $ \_cc -> pure Dead
+            (r, Dead) -> do
+                traceM "emptyR"
+                pure r
+                -- lift $ actL
+            (Dead, r) -> do
+                traceM "emptyL"
+                pure r
+                -- lift $ actR 
+                -- lift $ actR
             (resL@(Resume cl actL), resR@(Resume cr actR)) -> do
                 traceM $ show (resL, resR)
                 if cl <= cr then traceM "picked L" >> loop (lift $ actL) (pure resR)
@@ -75,7 +79,7 @@ instance (Show r, Monoid c, Ord c, Monad m, Show c) => MonadAStar c r (AStarT r 
         cost <- ask
         pure $ Resume (cost <> c) (local (c <>) $ cc ())
   -- estimate c = AStarT $ local (const c) . unwrapAStarT $ spend mempty
-  estimate c = undefined
+  estimate _c = undefined
   done r = AStarT . shiftT $ \_cc -> do
       pure (Done r)
 
@@ -93,17 +97,16 @@ runAStarT (AStarT m) = flip runReaderT mempty $ do
     unwrapped <- flip runContT (pure . Done) $ m
     loop1 unwrapped
 
-
-shower :: Show r => Resume c m r -> [Char]
-shower (Resume _ _) = "Resume"
-shower (Done r) = show r
-shower Dead = "Dead"
-
-tester :: AStarT Int (Sum Int) IO x
+tester :: AStarT Int (Sum Int) IO Int
 tester = do
     spend 100
-    printCost
-    asum [spend 10 *> done 1, spend 10 *> done 2, spend 15 *> spend 0 *> printCost *> done 100, spend 20 *> tester]
+    -- printCost
+    -- asum [spend 10 *> pure 1, spend 10 *> pure 2]
+    -- (spend 20 *> pure 2) <|> (spend 10 *> pure 1) <|> (spend 20 *> pure 2)
+    r <- empty <|> (spend 10 *> printCost *> spend 8 *> pure 10) <|> empty <|> (spend 5 *> spend 900 *> spend 7 *> printCost *> pure 5)
+    spend 1 <|> spend 2
+    pure r
+
 
 
 printCost :: Show c => AStarT r c IO ()
