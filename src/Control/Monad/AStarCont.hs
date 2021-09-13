@@ -35,26 +35,23 @@ newtype AStarT r c m a =
 instance (Monad m, Ord c) => Alternative (AStarT r c m) where
   empty = AStarT . shiftT $ \_cc -> do
          pure Dead
-  AStarT l <|> AStarT r = AStarT $ loop l r
+  AStarT l <|> AStarT r = AStarT $ alt' l r
 
-loop :: (Monad m, Ord c) =>
+alt' :: (Monad m, Ord c) =>
      ContT (Resume c m r) m a
   -> ContT (Resume c m r) m a
   -> ContT (Resume c m r) m a
-loop l r = do
-    shiftT $ \cc -> do
-          ll <- resetT $ l >>= lift . cc
-          lr <- resetT $ r >>= lift . cc
-          case (ll, lr) of
-            (resL@(Resume cl actL), resR@(Resume cr actR)) -> do
-                if cl <= cr then loop (lift $ actL) (pure resR)
-                            else loop (lift $ actR) (pure resL)
-            (Done r, _) -> pure (Done r)
-            (_, Done r) -> pure (Done r)
-            (r, Dead) -> do
-                pure r
-            (Dead, r) -> do
-                pure r
+alt' l r = shiftT $ \cc -> do
+  ll <- resetT $ l >>= lift . cc
+  lr <- resetT $ r >>= lift . cc
+  case (ll, lr) of
+    (resL@(Resume cl actL), resR@(Resume cr actR))
+        | cl <= cr -> alt' (lift $ actL) (pure resR)
+        | otherwise -> alt' (lift $ actR) (pure resL)
+    (Done r, _) -> pure (Done r)
+    (_, Done r) -> pure (Done r)
+    (r, Dead) -> pure r
+    (Dead, r) -> pure r
 
 instance (Monoid c, Ord c, Monad m) => MonadAStar c r (AStarT r c m) where
   spend c = do
